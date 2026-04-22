@@ -1,0 +1,3 @@
+case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,hole_1_position,bore_2_d1,bore_all_diameter_offset,all_hole_diameter_scale,upper_holes_shift
+base,open,100,300,25,25,false,TMM,unflanged,false,,,,,
+variant,closed,100,300,25,20,false,TMM,unflanged,false,190,21,0.5,1.1,2
