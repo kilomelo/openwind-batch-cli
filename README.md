@@ -123,6 +123,9 @@ owbatch run \
 - `compute_method`
 - `radiation_category`
 - `spherical_waves`
+- `flute_type_instrument`
+- `player_preset`
+- `source_location`
 
 派生/批量变换字段草案：
 - `bore_all_diameter_offset`
@@ -144,6 +147,10 @@ owbatch run \
   - `bore_all_diameter_offset`
   - `all_hole_diameter_scale`
   - `upper_holes_shift`，要求 `holes_template.csv` 中存在 `group=upper`
+- 当前已支持的 player/source 字段：
+  - `flute_type_instrument`：`true` 时默认映射到 `Player("FLUTE")`，`false` 时默认映射到 `Player("UNITARY_FLOW")`
+  - `player_preset`：可显式指定 OpenWind `Player(...)` 预设，例如 `UNITARY_FLOW`、`FLUTE`、`SOPRANO_RECORDER`
+  - `source_location`：传给 OpenWind `source_location`，默认通常为 `entrance`
 
 ## 计划输出
 

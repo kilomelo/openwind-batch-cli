@@ -36,6 +36,26 @@ def test_expand_cases_applies_transforms_and_overrides() -> None:
     assert variant_case.holes_rows[1]["diameter"] == "4.95"
 
 
+def test_expand_cases_maps_flute_type_to_player_preset(tmp_path: Path) -> None:
+    template = load_template(FIXTURE_DIR)
+    cases_path = tmp_path / "cases.csv"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument,source_location",
+                "flute_probe,open,100,300,25,25,false,TMM,unflanged,false,true,entrance",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    expanded = expand_cases(template, cases_path)
+
+    assert len(expanded) == 1
+    assert expanded[0].openwind_kwargs["player_preset"] == "FLUTE"
+    assert expanded[0].openwind_kwargs["source_location"] == "entrance"
+
+
 def test_expand_cases_tolerates_trailing_empty_cells(tmp_path: Path) -> None:
     template = load_template(FIXTURE_DIR)
     cases_path = tmp_path / "cases.csv"

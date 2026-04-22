@@ -205,6 +205,35 @@ h2,o,x
   - OpenWind 特殊字符串：`spherical_area_corr`
   建议：
   - 第一轮先用 `false`
+- `flute_type_instrument`
+  是否按 flute-like player 计算。
+  当前可填：
+  - 布尔型：`true`, `false`, `yes`, `no`, `on`, `off`, `1`, `0`
+  当前 owbatch 行为：
+  - `true`：若未显式指定 `player_preset`，自动映射到 `Player("FLUTE")`
+  - `false`：若未显式指定 `player_preset`，自动映射到 `Player("UNITARY_FLOW")`
+  说明：
+  - 这是为了对照官方 demo 的 “Flute-type instrument” 开关加入的验证版选项
+- `player_preset`
+  显式指定 OpenWind 的 `Player(...)` 预设名。
+  常用值：
+  - `UNITARY_FLOW`
+  - `FLUTE`
+  - `SOPRANO_RECORDER`
+  建议：
+  - 需要复核 flute-like 假设时，优先直接写 `FLUTE`
+  - 若同时填写 `flute_type_instrument`，两者必须逻辑一致
+  说明：
+  - `FLUTE` / `SOPRANO_RECORDER` 不只是名字不同，它们会带入 OpenWind 内置的 flute/window 激励参数
+  - 其中 `FLUTE` 预设还自带 embouchure/window 的 `radiation_category`
+- `source_location`
+  OpenWind 的声源位置标签。
+  常用值：
+  - `entrance`
+  - 某个 hole 的 `label`
+  说明：
+  - 留空时使用 OpenWind 默认值，通常是 `entrance`
+  - 若填某个 hole label，该标签必须存在于 `holes_template.csv`
 - `bore_all_diameter_offset`
   对所有 bore 段的 `d0` / `d1` 统一加一个偏移量，单位 mm。
 - `all_hole_diameter_scale`
@@ -233,8 +262,8 @@ h2,o,x
 建议最小起步行：
 
 ```csv
-case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves
-base,G4,100,3000,5,25,false,TMM,unflanged,false
+case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument
+base,G4,100,3000,5,25,false,TMM,unflanged,false,true
 ```
 
 ## 当前流程

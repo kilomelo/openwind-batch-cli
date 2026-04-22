@@ -86,12 +86,23 @@ def _read_case_rows(cases_path: Path) -> list[dict[str, str]]:
 
 def _build_case_definition(case_id: str, row: dict[str, str]) -> CaseDefinition:
     sweep = _parse_frequency_sweep(case_id, row)
+    flute_type_instrument = _parse_optional_bool(
+        case_id,
+        "flute_type_instrument",
+        row.get("flute_type_instrument", ""),
+    )
     solver = SolverSettings(
         temperature_c=_parse_optional_float(case_id, "temperature_c", row.get("temperature_c", "")),
         losses=_parse_bool_or_string(row.get("losses", "")),
         compute_method=_empty_to_none(row.get("compute_method", "")),
         radiation_category=_empty_to_none(row.get("radiation_category", "")),
         spherical_waves=_parse_bool_or_string(row.get("spherical_waves", "")),
+        player_preset=_resolve_player_preset(
+            case_id,
+            row.get("player_preset", ""),
+            flute_type_instrument,
+        ),
+        source_location=_empty_to_none(row.get("source_location", "")),
     )
 
     geometry_overrides: dict[str, str] = {}
@@ -248,6 +259,10 @@ def _build_openwind_kwargs(definition: CaseDefinition) -> dict[str, object]:
         kwargs["radiation_category"] = definition.solver.radiation_category
     if definition.solver.spherical_waves is not None:
         kwargs["spherical_waves"] = definition.solver.spherical_waves
+    if definition.solver.player_preset is not None:
+        kwargs["player_preset"] = definition.solver.player_preset
+    if definition.solver.source_location is not None:
+        kwargs["source_location"] = definition.solver.source_location
     return kwargs
 
 
@@ -282,6 +297,20 @@ def _parse_optional_float(case_id: str, field_name: str, raw_value: str) -> floa
     return _parse_required_float(case_id, field_name, raw_value)
 
 
+def _parse_optional_bool(case_id: str, field_name: str, raw_value: str) -> bool | None:
+    value = raw_value.strip()
+    if not value:
+        return None
+    lowered = value.lower()
+    if lowered in BOOL_TRUE_VALUES:
+        return True
+    if lowered in BOOL_FALSE_VALUES:
+        return False
+    raise ValueError(
+        f"Case '{case_id}' has non-boolean value for '{field_name}': {raw_value!r}"
+    )
+
+
 def _parse_required_float(case_id: str, field_name: str, raw_value: str) -> float:
     try:
         return float(raw_value)
@@ -306,6 +335,43 @@ def _parse_bool_or_string(raw_value: str) -> bool | str | None:
 def _empty_to_none(value: str) -> str | None:
     stripped = value.strip()
     return stripped or None
+
+
+def _resolve_player_preset(
+    case_id: str,
+    raw_player_preset: str,
+    flute_type_instrument: bool | None,
+) -> str | None:
+    player_preset = _normalize_player_preset(raw_player_preset)
+
+    if flute_type_instrument is True:
+        if player_preset is None:
+            return "FLUTE"
+        if player_preset not in {"FLUTE", "SOPRANO_RECORDER"}:
+            raise ValueError(
+                f"Case '{case_id}' sets flute_type_instrument=true but player_preset="
+                f"{raw_player_preset!r} is not flute-like."
+            )
+        return player_preset
+
+    if flute_type_instrument is False:
+        if player_preset is None:
+            return "UNITARY_FLOW"
+        if player_preset in {"FLUTE", "SOPRANO_RECORDER"}:
+            raise ValueError(
+                f"Case '{case_id}' sets flute_type_instrument=false but player_preset="
+                f"{raw_player_preset!r} is flute-like."
+            )
+        return player_preset
+
+    return player_preset
+
+
+def _normalize_player_preset(raw_value: str) -> str | None:
+    stripped = raw_value.strip()
+    if not stripped:
+        return None
+    return stripped.upper().replace("-", "_").replace(" ", "_")
 
 
 def _format_float(value: float) -> str:

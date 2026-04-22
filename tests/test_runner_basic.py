@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from owbatch.cli import main
@@ -81,3 +82,40 @@ def test_run_command_writes_impedance_csv(tmp_path: Path) -> None:
     float(sample_parts[0])
     float(sample_parts[1])
     float(sample_parts[2])
+
+
+def test_run_command_supports_flute_player_preset(tmp_path: Path) -> None:
+    cases_path = tmp_path / "cases.csv"
+    out_dir = tmp_path / "out"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument",
+                "flow_case,open,100,300,25,25,false,TMM,unflanged,false,false",
+                "flute_case,open,100,300,25,25,false,TMM,unflanged,false,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "run",
+            "--template-dir",
+            str(FIXTURE_DIR),
+            "--cases",
+            str(cases_path),
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert exit_code == 0
+
+    impedance_frame = pd.read_csv(out_dir / "impedance.csv")
+    flow_abs_z = impedance_frame.loc[impedance_frame["case_id"] == "flow_case", "abs_z"].to_numpy()
+    flute_abs_z = impedance_frame.loc[impedance_frame["case_id"] == "flute_case", "abs_z"].to_numpy()
+
+    assert flow_abs_z.shape == flute_abs_z.shape
+    assert flow_abs_z.size > 0
+    assert not np.allclose(flow_abs_z, flute_abs_z)
