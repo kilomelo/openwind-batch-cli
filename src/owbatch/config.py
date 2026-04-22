@@ -56,6 +56,9 @@ RESERVED_CASE_COLUMNS = {
     "compute_method",
     "radiation_category",
     "spherical_waves",
+    "flute_type_instrument",
+    "player_preset",
+    "source_location",
 }
 
 DERIVED_CASE_COLUMNS = {

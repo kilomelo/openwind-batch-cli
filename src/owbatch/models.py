@@ -38,10 +38,12 @@ class SolverSettings:
     """OpenWind-facing solver settings kept as a stable internal schema."""
 
     temperature_c: float | None = None
-    losses: str | None = None
+    losses: bool | str | None = None
     compute_method: str | None = None
     radiation_category: str | None = None
-    spherical_waves: bool | None = None
+    spherical_waves: bool | str | None = None
+    player_preset: str | None = None
+    source_location: str | None = None
 
 
 @dataclass(slots=True)

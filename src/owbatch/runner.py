@@ -122,7 +122,7 @@ def _compute_case_impedance(case: ExpandedCase) -> tuple[np.ndarray, np.ndarray]
         unit=GEOMETRY_UNIT,
         diameter=True,
         nondim=False,
-        **case.openwind_kwargs,
+        **_materialize_openwind_kwargs(case.openwind_kwargs),
     )
     return (
         np.asarray(result.frequencies, dtype=float),
@@ -232,6 +232,27 @@ def _load_impedance_computation():
     from openwind import ImpedanceComputation
 
     return ImpedanceComputation
+
+
+def _load_player():
+    _prepare_runtime_environment()
+    from openwind import Player
+
+    return Player
+
+
+def _materialize_openwind_kwargs(openwind_kwargs: dict[str, object]) -> dict[str, object]:
+    kwargs = dict(openwind_kwargs)
+    player_preset = kwargs.pop("player_preset", None)
+    if player_preset is not None:
+        try:
+            kwargs["player"] = _load_player()(str(player_preset))
+        except Exception as exc:
+            raise ValueError(
+                f"OpenWind rejected player_preset {player_preset!r}. "
+                "Check the preset name and player-related case settings."
+            ) from exc
+    return kwargs
 
 
 def _prepare_runtime_environment() -> None:
