@@ -1,2 +1,4 @@
 case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument,player_preset,source_location
+flow_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,false,,entrance
 flute_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,true,,entrance
+recorder_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,,SOPRANO_RECORDER,entrance

@@ -9,22 +9,24 @@ from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
+from owbatch.analysis import extract_analysis_rows
 from owbatch.case_expander import expand_cases
 from owbatch.config import (
-    ANALYSIS_COLUMNS,
-    FEATURE_COLUMNS,
     GEOMETRY_UNIT,
     build_output_paths,
 )
+from owbatch.extractors import extract_frequency_features
 from owbatch.models import ExpandedCase, InspectRequest, RunRequest
 from owbatch.response import build_response_rows, compute_admittance
 from owbatch.template_loader import load_template
 from owbatch.writers import (
     sanitize_case_filename,
+    write_analysis_csv,
+    write_features_csv,
     write_impedance_csv,
     write_impedance_list_csv,
-    write_placeholder_csv,
 )
 
 
@@ -73,6 +75,7 @@ def run_batch(request: RunRequest) -> str:
                 note=case.definition.note or "",
                 frequencies=frequencies,
                 impedance=impedance,
+                player_preset=case.definition.solver.player_preset,
             )
         )
         write_impedance_list_csv(
@@ -87,19 +90,28 @@ def run_batch(request: RunRequest) -> str:
             admittance_phase_rad=np.angle(admittance).tolist(),
         )
 
+    impedance_frame = _build_response_export_frame(impedance_rows)
     write_impedance_csv(output_paths["impedance"], impedance_rows)
-    write_placeholder_csv(output_paths["features"], FEATURE_COLUMNS)
-    write_placeholder_csv(output_paths["analysis"], ANALYSIS_COLUMNS)
+    features_frame = extract_frequency_features(impedance_frame)
+    feature_rows = features_frame.to_dict(orient="records")
+    write_features_csv(output_paths["features"], feature_rows)
+    analysis_rows = extract_analysis_rows(
+        features_frame,
+        case_frame=impedance_frame,
+    ).to_dict(orient="records")
+    write_analysis_csv(output_paths["analysis"], analysis_rows)
 
     return "\n".join(
         [
             f"cases_processed: {len(expanded_cases)}",
             f"impedance_rows: {len(impedance_rows)}",
+            f"feature_rows: {len(feature_rows)}",
+            f"analysis_rows: {len(analysis_rows)}",
             f"impedance_csv: {output_paths['impedance']}",
             f"impedance_lists_dir: {output_paths['impedance_lists_dir']}",
             f"features_csv: {output_paths['features']}",
             f"analysis_csv: {output_paths['analysis']}",
-            "status: aggregate impedance and per-case impedance lists are complete; features and analysis are placeholder headers for now.",
+            "status: aggregate impedance, per-case impedance lists, primary peak features, and per-case harmonic analysis are complete.",
         ]
     )
 
@@ -232,3 +244,7 @@ def _prepare_runtime_environment() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     os.environ.setdefault("MPLCONFIGDIR", str(mpl_cache))
     os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
+
+
+def _build_response_export_frame(rows: list[dict[str, object]]) -> pd.DataFrame:
+    return pd.DataFrame(rows)

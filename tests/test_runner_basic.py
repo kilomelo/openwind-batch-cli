@@ -59,8 +59,43 @@ def test_run_command_writes_impedance_csv(tmp_path: Path) -> None:
     assert tuple(analysis_frame.columns) == ANALYSIS_COLUMNS
     assert set(impedance_frame["case_id"]) == {"base", "variant"}
     assert set(impedance_frame["note"]) == {"open", "closed"}
+    assert set(impedance_frame["player_preset"]) == {"UNITARY_FLOW"}
+    assert set(impedance_frame["default_response_mode"]) == {"impedance"}
+    assert set(impedance_frame["primary_feature_family"]) == {"z_resonance"}
     assert len(impedance_frame) == 18
     assert (impedance_frame["abs_z"] > 0).all()
+    if not features_frame.empty:
+        assert (features_frame["q_factor"] > 0).all()
+        assert set(features_frame["kind"]) == {"z_resonance"}
+    assert len(analysis_frame) == 2
+    assert set(analysis_frame["feature_family"]) == {"z_resonance"}
+    populated_analysis = analysis_frame["f1"].notna()
+    assert populated_analysis.any()
+    assert analysis_frame.loc[populated_analysis, "pitch1"].astype(str).str.len().gt(0).all()
+    assert analysis_frame.loc[populated_analysis, "q1"].notna().all()
+    assert analysis_frame.loc[populated_analysis, "a1"].notna().all()
+    populated_harmonics = analysis_frame["f2"].notna()
+    if populated_harmonics.any():
+        ratios = analysis_frame.loc[populated_harmonics, "f2"] / analysis_frame.loc[populated_harmonics, "f1"]
+        assert np.allclose(
+            analysis_frame.loc[populated_harmonics, "h2"],
+            ratios,
+        )
+        nearest_multiples = np.maximum(
+            1,
+            np.floor(ratios.to_numpy(dtype=float) + 0.5).astype(int),
+        )
+        expected_delta = 1200.0 * np.log2(
+            analysis_frame.loc[populated_harmonics, "f2"]
+            / (
+                analysis_frame.loc[populated_harmonics, "f1"]
+                * nearest_multiples
+            )
+        )
+        assert np.allclose(
+            analysis_frame.loc[populated_harmonics, "delta2_cents"].to_numpy(dtype=float),
+            expected_delta.to_numpy(dtype=float),
+        )
 
     base_list = out_dir / "impedances" / "base.csv"
     variant_list = out_dir / "impedances" / "variant.csv"
@@ -115,7 +150,21 @@ def test_run_command_supports_flute_player_preset(tmp_path: Path) -> None:
     impedance_frame = pd.read_csv(out_dir / "impedance.csv")
     flow_abs_z = impedance_frame.loc[impedance_frame["case_id"] == "flow_case", "abs_z"].to_numpy()
     flute_abs_z = impedance_frame.loc[impedance_frame["case_id"] == "flute_case", "abs_z"].to_numpy()
+    flute_modes = set(
+        impedance_frame.loc[
+            impedance_frame["case_id"] == "flute_case",
+            "default_response_mode",
+        ]
+    )
+    flute_feature_families = set(
+        impedance_frame.loc[
+            impedance_frame["case_id"] == "flute_case",
+            "primary_feature_family",
+        ]
+    )
 
     assert flow_abs_z.shape == flute_abs_z.shape
     assert flow_abs_z.size > 0
     assert not np.allclose(flow_abs_z, flute_abs_z)
+    assert flute_modes == {"admittance"}
+    assert flute_feature_families == {"y_resonance"}

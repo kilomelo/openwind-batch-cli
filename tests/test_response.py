@@ -4,9 +4,12 @@ import numpy as np
 import pandas as pd
 
 from owbatch.response import (
+    build_case_response_metadata,
+    build_case_response_metadata_from_row,
     build_response_frame,
     infer_default_response_mode,
     infer_primary_feature_family,
+    resolve_requested_response_mode,
 )
 
 
@@ -55,3 +58,50 @@ def test_flute_like_semantics_default_to_admittance_family() -> None:
 
     assert infer_primary_feature_family("FLUTE") == "y_resonance"
     assert infer_primary_feature_family("UNITARY_FLOW") == "z_resonance"
+
+
+def test_build_case_response_metadata_exposes_future_feature_hints() -> None:
+    flute_metadata = build_case_response_metadata(player_preset="FLUTE")
+    flow_metadata = build_case_response_metadata(player_preset=None)
+
+    assert flute_metadata["player_preset"] == "FLUTE"
+    assert flute_metadata["is_flute_like"] is True
+    assert flute_metadata["default_response_mode"] == "admittance"
+    assert flute_metadata["primary_feature_family"] == "y_resonance"
+
+    assert flow_metadata["player_preset"] == "UNITARY_FLOW"
+    assert flow_metadata["is_flute_like"] is False
+    assert flow_metadata["default_response_mode"] == "impedance"
+    assert flow_metadata["primary_feature_family"] == "z_resonance"
+
+
+def test_build_case_response_metadata_from_row_reads_row_like_metadata() -> None:
+    row_metadata = build_case_response_metadata_from_row({"player_preset": "soprano_recorder"})
+
+    assert row_metadata["player_preset"] == "SOPRANO_RECORDER"
+    assert row_metadata["default_response_mode"] == "admittance"
+    assert row_metadata["primary_feature_family"] == "y_resonance"
+
+
+def test_resolve_requested_response_mode_supports_auto_and_explicit_override() -> None:
+    flute_frame = pd.DataFrame(
+        {
+            "frequency_hz": [100.0],
+            "re_z": [1.0],
+            "im_z": [0.0],
+            "player_preset": ["FLUTE"],
+        }
+    )
+    flow_frame = pd.DataFrame(
+        {
+            "frequency_hz": [100.0],
+            "re_z": [1.0],
+            "im_z": [0.0],
+            "player_preset": ["UNITARY_FLOW"],
+        }
+    )
+
+    assert resolve_requested_response_mode(flute_frame, requested_mode="auto") == "admittance"
+    assert resolve_requested_response_mode(flow_frame, requested_mode="auto") == "impedance"
+    assert resolve_requested_response_mode(flute_frame, requested_mode="impedance") == "impedance"
+    assert resolve_requested_response_mode(flow_frame, requested_mode="admittance") == "admittance"

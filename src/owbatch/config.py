@@ -45,6 +45,8 @@ OUTPUT_FILENAMES = (
     OUTPUT_ANALYSIS_FILENAME,
 )
 
+DEFAULT_PRIMARY_PEAK_COUNT = 3
+
 RESERVED_CASE_COLUMNS = {
     "case_id",
     "note",
@@ -73,6 +75,10 @@ BOOL_FALSE_VALUES = {"0", "false", "no", "n", "off"}
 IMPEDANCE_COLUMNS = (
     "case_id",
     "note",
+    "player_preset",
+    "is_flute_like",
+    "default_response_mode",
+    "primary_feature_family",
     "frequency_hz",
     "re_z",
     "im_z",
@@ -98,26 +104,30 @@ FEATURE_COLUMNS = (
     "angle_y_deg",
 )
 
-ANALYSIS_COLUMNS = (
-    "case_id",
-    "note",
-    "f1",
-    "f2",
-    "f3",
-    "f4",
-    "h2",
-    "h3",
-    "h4",
-    "delta2_cents",
-    "delta3_cents",
-    "delta4_cents",
-    "q1",
-    "q2",
-    "q3",
-    "a1",
-    "a2",
-    "a3",
-)
+def build_analysis_columns(
+    peak_count: int = DEFAULT_PRIMARY_PEAK_COUNT,
+) -> tuple[str, ...]:
+    """Return the flat per-case analysis schema for the first ``peak_count`` peaks."""
+
+    if peak_count <= 0:
+        raise ValueError(f"peak_count must be > 0, got {peak_count}.")
+
+    columns = [
+        "case_id",
+        "note",
+        "feature_family",
+    ]
+    columns.extend(f"f{index}" for index in range(1, peak_count + 1))
+    columns.extend(f"pitch{index}" for index in range(1, peak_count + 1))
+    columns.extend(f"pitch{index}_cents" for index in range(1, peak_count + 1))
+    columns.extend(f"h{index}" for index in range(2, peak_count + 1))
+    columns.extend(f"delta{index}_cents" for index in range(2, peak_count + 1))
+    columns.extend(f"q{index}" for index in range(1, peak_count + 1))
+    columns.extend(f"a{index}" for index in range(1, peak_count + 1))
+    return tuple(columns)
+
+
+ANALYSIS_COLUMNS = build_analysis_columns()
 
 
 def build_output_paths(out_dir: Path) -> dict[str, Path]:

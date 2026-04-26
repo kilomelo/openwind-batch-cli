@@ -282,6 +282,12 @@ base,G4,100,3000,5,25,false,TMM,unflanged,false,true
 
 这套逻辑不是只存在于画图层，而是由共享的响应派生层统一提供，后续 `features.csv` / `analysis.csv` 也会基于同一套语义。
 
+当前 `impedance.csv` 还会带出一些和语义选择相关的元数据列，便于后续自动分析：
+- `player_preset`
+- `is_flute_like`
+- `default_response_mode`
+- `primary_feature_family`
+
 填完之后可先跑：
 
 ```bash
@@ -303,13 +309,27 @@ PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m 
 - `examples/real_data/out/impedance.csv`
 - `examples/real_data/out/impedances/<case_id>.csv`
 - `examples/real_data/out/features.csv`
+  当前默认写每个 case 主特征族前 `3` 个峰值频率与 Q-factor
 - `examples/real_data/out/analysis.csv`
+  当前默认按这 `3` 个主峰汇总最近音高、音分偏差、相对 `f1` 最近整数倍的倍频偏差，以及 `q1` / `q2` / `q3`
 
 ## 简单绘图
 
 可以直接把 `out/impedance.csv` 画成每个 case 一条线的双图响应。
 
-画阻抗语义响应：
+按自动语义响应绘图：
+
+```bash
+PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.plot_impedance \
+  --input examples/real_data/out/impedance.csv \
+  --output examples/real_data/out/auto_response.png
+```
+
+默认 `--mode auto`：
+- flute-like preset 会优先画 admittance 语义
+- 非 flute-like preset 会优先画 impedance 语义
+
+显式画阻抗语义响应：
 
 ```bash
 PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.plot_impedance \
@@ -327,3 +347,30 @@ PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m 
   --angle-unit deg \
   --output examples/real_data/out/admittance_response.png
 ```
+
+也可以把分析表画成 case 对应的倍频偏差折线图：
+
+```bash
+PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.plot_analysis \
+  --input examples/real_data/out/analysis.csv \
+  --output examples/real_data/out/analysis_deviation.png
+```
+
+这个图会自动查找非空的 `deltaN_cents` 列：
+- 如果当前分析表是 `f1/f2/f3`，则画 `delta2_cents`、`delta3_cents`
+- 如果以后扩展到 `f4`，则会额外画 `delta4_cents`
+
+如果你想在窗口里用鼠标查看某个点的精确数值，可以用交互式查看工具：
+
+```bash
+PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.view_analysis \
+  --input examples/real_data/out/analysis.csv
+```
+
+打开窗口后，把鼠标悬停到折线点上，会显示：
+- `case`
+- `note`
+- `deltaN_cents`
+- 对应峰值频率 `fN`
+- 对应比值 `hN`
+- 最近整数倍

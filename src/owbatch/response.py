@@ -18,15 +18,24 @@ extractors from silently diverging.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 
 ResponseMode = Literal["impedance", "admittance"]
+RequestedResponseMode = Literal["auto", "impedance", "admittance"]
 AngleUnit = Literal["rad", "deg", "pi"]
 
 FLUTE_LIKE_PLAYER_PRESETS = frozenset({"FLUTE", "SOPRANO_RECORDER"})
+DEFAULT_PLAYER_PRESET = "UNITARY_FLOW"
+RESPONSE_METADATA_COLUMNS = (
+    "player_preset",
+    "is_flute_like",
+    "default_response_mode",
+    "primary_feature_family",
+)
 
 
 def build_response_frame(
@@ -44,7 +53,7 @@ def build_response_frame(
             f"missing {missing_columns}."
         )
 
-    response_frame = frame.copy()
+    response_frame = annotate_response_metadata(frame)
     impedance = (
         response_frame["re_z"].to_numpy(dtype=float)
         + 1j * response_frame["im_z"].to_numpy(dtype=float)
@@ -66,6 +75,7 @@ def build_response_rows(
     note: str,
     frequencies: np.ndarray,
     impedance: np.ndarray,
+    player_preset: str | None = None,
     zc0: complex | float = 1.0,
 ) -> list[dict[str, float | str]]:
     """Return CSV-ready response rows for one case."""
@@ -79,6 +89,7 @@ def build_response_rows(
             "im_z": np.imag(impedance),
         }
     )
+    frame["player_preset"] = player_preset
     return build_response_frame(frame, zc0=zc0).to_dict(orient="records")
 
 
@@ -104,6 +115,25 @@ def get_mode_columns(mode: ResponseMode) -> tuple[str, str]:
     if mode == "admittance":
         return "abs_y", "angle_y_rad"
     raise ValueError(f"Unsupported response mode: {mode}")
+
+
+def annotate_response_metadata(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy of ``frame`` enriched with reusable response metadata."""
+
+    response_frame = frame.copy()
+    if "player_preset" not in response_frame.columns:
+        response_frame["player_preset"] = None
+
+    metadata = [
+        build_case_response_metadata(player_preset=value)
+        for value in response_frame["player_preset"].tolist()
+    ]
+    metadata_frame = pd.DataFrame(metadata, index=response_frame.index)
+
+    for column_name in RESPONSE_METADATA_COLUMNS:
+        response_frame[column_name] = metadata_frame[column_name]
+
+    return response_frame
 
 
 def format_angle_values(values: pd.Series, *, unit: AngleUnit) -> np.ndarray:
@@ -138,6 +168,60 @@ def get_modulus_axis_label(mode: ResponseMode) -> str:
     return "|Z|" if mode == "impedance" else "|Y|"
 
 
+def build_case_response_metadata(
+    *,
+    player_preset: str | None,
+) -> dict[str, object]:
+    """Return semantic metadata derived from one case's player preset."""
+
+    normalized_player_preset = normalize_player_preset(player_preset)
+    default_response_mode = infer_default_response_mode(normalized_player_preset)
+    return {
+        "player_preset": normalized_player_preset,
+        "is_flute_like": is_flute_like_player_preset(normalized_player_preset),
+        "default_response_mode": default_response_mode,
+        "primary_feature_family": infer_primary_feature_family(normalized_player_preset),
+    }
+
+
+def build_case_response_metadata_from_row(
+    row: Mapping[str, object],
+) -> dict[str, object]:
+    """Return semantic metadata for one case/group row-like object."""
+
+    return build_case_response_metadata(player_preset=row.get("player_preset"))
+
+
+def resolve_requested_response_mode(
+    frame: pd.DataFrame,
+    *,
+    requested_mode: RequestedResponseMode = "auto",
+) -> ResponseMode:
+    """Resolve ``auto`` into a concrete response mode for one plotted dataset."""
+
+    if requested_mode in {"impedance", "admittance"}:
+        return requested_mode
+    if requested_mode != "auto":
+        raise ValueError(f"Unsupported requested response mode: {requested_mode}")
+
+    annotated_frame = annotate_response_metadata(frame)
+    available_modes = sorted(
+        {
+            str(mode)
+            for mode in annotated_frame["default_response_mode"].dropna().unique().tolist()
+        }
+    )
+    if not available_modes:
+        return infer_default_response_mode(None)
+    if len(available_modes) == 1:
+        return available_modes[0]  # type: ignore[return-value]
+    raise ValueError(
+        "Auto response mode is ambiguous because the selected cases map to "
+        f"multiple semantic defaults: {available_modes}. "
+        "Specify --mode impedance or --mode admittance explicitly."
+    )
+
+
 def infer_default_response_mode(player_preset: str | None) -> ResponseMode:
     """Infer the most natural response family to inspect for one player preset.
 
@@ -161,6 +245,15 @@ def infer_primary_feature_family(player_preset: str | None) -> str:
 def is_flute_like_player_preset(player_preset: str | None) -> bool:
     """Return whether one player preset should be interpreted as flute-like."""
 
+    return normalize_player_preset(player_preset) in FLUTE_LIKE_PLAYER_PRESETS
+
+
+def normalize_player_preset(player_preset: object) -> str:
+    """Normalize one preset name for semantic use and CSV export."""
+
     if player_preset is None:
-        return False
-    return player_preset.upper() in FLUTE_LIKE_PLAYER_PRESETS
+        return DEFAULT_PLAYER_PRESET
+    if pd.isna(player_preset):
+        return DEFAULT_PLAYER_PRESET
+    normalized = str(player_preset).strip().upper()
+    return normalized or DEFAULT_PLAYER_PRESET

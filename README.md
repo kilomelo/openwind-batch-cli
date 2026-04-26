@@ -71,7 +71,8 @@ owbatch inspect --template-dir ./templates/xiao_a --cases ./cases.csv
 - 已能执行最小频域批处理
 - 已输出 `impedance.csv`
 - 已为每个 case 额外输出一个阻抗列表文件到 `impedances/`
-- 当前 `features.csv` 和 `analysis.csv` 先写空表头，后续再接特征提取
+- 已输出 `features.csv`，当前默认提取每个 case 主特征族的前 `3` 个峰值频率和 Q-factor
+- 已输出 `analysis.csv`，当前默认基于前 `3` 个主峰汇总音高、倍频偏差与 Q-factor
 
 示例：
 
@@ -161,12 +162,35 @@ owbatch run \
 
 当前状态：
 - `impedance.csv` 已实现
+- `impedance.csv` 当前除复阻抗与派生响应列外，还包含语义元数据：
+  - `player_preset`
+  - `is_flute_like`
+  - `default_response_mode`
+  - `primary_feature_family`
 - `impedances/<case_id>.csv` 已实现，当前格式为三列：
   - `frequency_hz`
   - `abs_y`
   - `angle_y_rad`
   文件使用空格分隔，并允许科学计数法，风格接近 OpenWind 原始导出
-- `features.csv` 和 `analysis.csv` 目前先输出空表头，占住接口
+- `features.csv` 已实现，当前默认输出每个 case 主特征族的前 `3` 个峰：
+  - 非 flute-like case：默认提取 `z_resonance`
+  - flute-like case：默认提取 `y_resonance`
+  - 当前每行至少包含：
+    - `kind`
+    - `index`
+    - `frequency_hz`
+    - `q_factor`
+    - `amplitude`
+- `analysis.csv` 已实现，当前每个 case / note 一行，默认汇总前 `3` 个主峰：
+  - `feature_family`
+  - `f1` / `f2` / `f3`
+  - `pitch1` / `pitch2` / `pitch3`
+  - `pitch1_cents` / `pitch2_cents` / `pitch3_cents`
+  - `h2` / `h3`
+  - `delta2_cents` / `delta3_cents`
+    这里的 `deltaN_cents` 表示“第 N 个峰相对 `f1` 的最近整数倍”的音分偏差，不是固定相对 `N*f1`
+  - `q1` / `q2` / `q3`
+  - `a1` / `a2` / `a3`
 
 ## 响应语义
 
@@ -202,9 +226,19 @@ owbatch run \
 owbatch-plot-impedance --input ./out/impedance.csv --output ./out/impedance_response.png
 ```
 
-默认按阻抗语义绘制双图：
-- 上图：`|Z|`
-- 下图：`angle(Z)`
+默认 `--mode auto`：
+- flute-like case，例如 `FLUTE` / `SOPRANO_RECORDER`：自动按导纳语义绘制
+- 非 flute-like case：自动按阻抗语义绘制
+- 若同一张图里混入两种默认语义，`auto` 会报错并要求显式指定 `--mode`
+
+显式按阻抗语义绘制双图：
+
+```bash
+owbatch-plot-impedance \
+  --input ./out/impedance.csv \
+  --mode impedance \
+  --output ./out/impedance_response.png
+```
 
 若要按导纳语义对齐 OpenWind demo 的 admittance 视图，可使用：
 
@@ -219,6 +253,31 @@ owbatch-plot-impedance \
 此时绘制：
 - 上图：`|Y|`
 - 下图：`angle(Y)`
+
+也可以把 `analysis.csv` 画成每个 case 一条横坐标、每个倍频偏差一条折线：
+
+```bash
+owbatch-plot-analysis \
+  --input ./out/analysis.csv \
+  --output ./out/analysis_deviation.png
+```
+
+当前行为：
+- 横轴：`case_id`
+- 纵轴：偏差音分 `deltaN_cents`
+- 若分析表只有 `f1/f2/f3`，则自动画 `delta2_cents`、`delta3_cents`
+- 若分析表有 `f4`，则会继续自动画 `delta4_cents`
+
+如果你需要在窗口里用鼠标查看某个点的精确值，可以用交互式查看工具：
+
+```bash
+owbatch-view-analysis \
+  --input ./out/analysis.csv
+```
+
+当前行为：
+- 打开 Matplotlib 交互窗口，不保存图片
+- 鼠标悬停到点上时，会显示 `case`、`note`、`deltaN_cents`、对应的 `fN`、`hN` 和最近整数倍
 
 ## 目录职责
 
@@ -235,11 +294,13 @@ owbatch-plot-impedance \
 - `src/owbatch/case_expander.py`
   下一阶段负责把 `cases.csv` 覆盖展开为完整几何与求解请求。
 - `src/owbatch/response.py`
-  统一的响应语义层，负责从 `re_z` / `im_z` 派生 `|Z|`、`angle(Z)`、`|Y|`、`angle(Y)`，供可视化和后续特征提取复用。
+统一的响应语义层，负责从 `re_z` / `im_z` 派生 `|Z|`、`angle(Z)`、`|Y|`、`angle(Y)`，供可视化和后续特征提取复用。
 - `src/owbatch/runner.py`
   下一阶段负责组织批处理执行、调用 OpenWind、串联导出。
 - `src/owbatch/extractors.py`
-  下一阶段负责从频域曲线提取 resonance / antiresonance 与分析指标。
+  当前负责从频域曲线提取主特征族峰值、频率与 Q-factor。
+- `src/owbatch/analysis.py`
+  当前负责把峰值表汇总成每个 case / note 一行的分析表，包括音高、音分偏差、倍频偏差和 Q-factor。
 - `src/owbatch/writers.py`
   下一阶段负责把结果写回 CSV。
 
@@ -253,7 +314,6 @@ owbatch-plot-impedance \
 ## 下一步
 
 下一阶段将实现：
-1. resonance / antiresonance 提取
-2. `features.csv` 写出
-3. `analysis.csv` 写出
-4. 更完整的输入校验与错误提示
+1. 扩展到更多特征族，例如 `z_antiresonance` / `y_antiresonance`
+2. 将峰值数量暴露为 CLI 参数
+3. 更完整的输入校验与错误提示

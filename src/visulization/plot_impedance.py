@@ -34,9 +34,10 @@ from owbatch.response import (
     get_angle_axis_label,
     get_mode_columns,
     get_modulus_axis_label,
+    resolve_requested_response_mode,
 )
 
-PLOT_MODES = ("impedance", "admittance")
+PLOT_MODES = ("auto", "impedance", "admittance")
 ANGLE_UNITS = ("rad", "deg", "pi")
 
 
@@ -47,7 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="owbatch-plot-impedance",
         description=(
             "Plot owbatch frequency responses with OpenWind-style semantics: "
-            "impedance mode draws |Z|/angle(Z), admittance mode draws |Y|/angle(Y)."
+            "auto follows case metadata; impedance draws |Z|/angle(Z); "
+            "admittance draws |Y|/angle(Y)."
         ),
     )
     parser.add_argument(
@@ -64,8 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         choices=PLOT_MODES,
-        default="impedance",
-        help="Response mode to display.",
+        default="auto",
+        help="Response mode to display. 'auto' follows case metadata.",
     )
     parser.add_argument(
         "--angle-unit",
@@ -125,7 +127,7 @@ def load_impedance_frame(path: Path) -> pd.DataFrame:
 def plot_response_frame(
     frame: pd.DataFrame,
     *,
-    mode: str = "impedance",
+    mode: str = "auto",
     angle_unit: str = "rad",
     title: str | None = None,
     note: str | None = None,
@@ -145,7 +147,8 @@ def plot_response_frame(
         filter_label = f" for note '{note}'" if note else ""
         raise ValueError(f"No impedance rows available{filter_label}.")
 
-    modulus_column, angle_column = get_mode_columns(mode)
+    resolved_mode = resolve_requested_response_mode(plot_frame, requested_mode=mode)
+    modulus_column, angle_column = get_mode_columns(resolved_mode)
     figure, (modulus_axis, angle_axis) = plt.subplots(
         2,
         1,
@@ -169,13 +172,13 @@ def plot_response_frame(
             linewidth=1.2,
         )
 
-    modulus_axis.set_ylabel(get_modulus_axis_label(mode))
-    modulus_axis.set_title(title or _build_default_title(mode, note))
+    modulus_axis.set_ylabel(get_modulus_axis_label(resolved_mode))
+    modulus_axis.set_title(title or _build_default_title(resolved_mode, note))
     modulus_axis.grid(True, alpha=0.3)
     modulus_axis.legend(title="case_id")
 
     angle_axis.set_xlabel("Frequency (Hz)")
-    angle_axis.set_ylabel(get_angle_axis_label(mode, unit=angle_unit))
+    angle_axis.set_ylabel(get_angle_axis_label(resolved_mode, unit=angle_unit))
     angle_axis.grid(True, alpha=0.3)
 
     figure.tight_layout()

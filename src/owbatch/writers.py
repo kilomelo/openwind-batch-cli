@@ -7,7 +7,19 @@ import re
 
 import pandas as pd
 
-from owbatch.config import IMPEDANCE_COLUMNS
+from owbatch.config import ANALYSIS_COLUMNS, FEATURE_COLUMNS, IMPEDANCE_COLUMNS
+
+
+def write_table_csv(
+    path: Path,
+    rows: list[dict[str, object]],
+    columns: tuple[str, ...],
+) -> None:
+    """Write rows to CSV with a stable column order."""
+
+    frame = pd.DataFrame(rows, columns=columns)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(path, index=False)
 
 
 def write_impedance_csv(
@@ -16,17 +28,31 @@ def write_impedance_csv(
 ) -> None:
     """Write impedance rows to CSV."""
 
-    frame = pd.DataFrame(rows, columns=IMPEDANCE_COLUMNS)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(path, index=False)
+    write_table_csv(path, rows, IMPEDANCE_COLUMNS)
+
+
+def write_features_csv(
+    path: Path,
+    rows: list[dict[str, object]],
+) -> None:
+    """Write extracted feature rows to CSV."""
+
+    write_table_csv(path, rows, FEATURE_COLUMNS)
+
+
+def write_analysis_csv(
+    path: Path,
+    rows: list[dict[str, object]],
+) -> None:
+    """Write per-case analysis rows to CSV."""
+
+    write_table_csv(path, rows, ANALYSIS_COLUMNS)
 
 
 def write_placeholder_csv(path: Path, columns: tuple[str, ...]) -> None:
     """Write an empty CSV with headers only."""
 
-    frame = pd.DataFrame(columns=columns)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(path, index=False)
+    write_table_csv(path, [], columns)
 
 
 def write_impedance_list_csv(

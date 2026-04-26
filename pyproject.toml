@@ -14,6 +14,7 @@ authors = [
 ]
 dependencies = [
   "matplotlib>=3.7",
+  "mplcursors>=0.7",
   "pandas>=2.0",
 ]
 
@@ -25,6 +26,8 @@ dev = [
 [project.scripts]
 owbatch = "owbatch.cli:main"
 owbatch-plot-impedance = "visulization.plot_impedance:main"
+owbatch-plot-analysis = "visulization.plot_analysis:main"
+owbatch-view-analysis = "visulization.view_analysis:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
