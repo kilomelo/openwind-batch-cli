@@ -1,4 +1,4 @@
-"""Plot `impedance.csv` with one line per case."""
+"""Plot impedance/admittance responses with OpenWind-aligned semantics."""
 
 from __future__ import annotations
 
@@ -28,24 +28,27 @@ _ensure_matplotlib_cache_dirs()
 import matplotlib.pyplot as plt
 import pandas as pd
 
-PLOT_COLUMNS = (
-    "re_z",
-    "im_z",
-    "abs_z",
-    "angle_z_rad",
-    "angle_z_deg",
-    "abs_y",
-    "angle_y_rad",
-    "angle_y_deg",
+from owbatch.response import (
+    build_response_frame,
+    format_angle_values,
+    get_angle_axis_label,
+    get_mode_columns,
+    get_modulus_axis_label,
 )
+
+PLOT_MODES = ("impedance", "admittance")
+ANGLE_UNITS = ("rad", "deg", "pi")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Create the CLI parser for the impedance plotting tool."""
+    """Create the CLI parser for the response plotting tool."""
 
     parser = argparse.ArgumentParser(
         prog="owbatch-plot-impedance",
-        description="Plot lines from owbatch impedance.csv, one line per case.",
+        description=(
+            "Plot owbatch frequency responses with OpenWind-style semantics: "
+            "impedance mode draws |Z|/angle(Z), admittance mode draws |Y|/angle(Y)."
+        ),
     )
     parser.add_argument(
         "--input",
@@ -59,10 +62,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional PNG output path. If omitted, open an interactive window.",
     )
     parser.add_argument(
-        "--y-column",
-        choices=PLOT_COLUMNS,
-        default="abs_z",
-        help="Value column to plot against frequency_hz.",
+        "--mode",
+        choices=PLOT_MODES,
+        default="impedance",
+        help="Response mode to display.",
+    )
+    parser.add_argument(
+        "--angle-unit",
+        choices=ANGLE_UNITS,
+        default="rad",
+        help="Display unit for the angle subplot.",
     )
     parser.add_argument(
         "--title",
@@ -81,10 +90,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    frame = load_impedance_frame(args.input)
-    figure = plot_impedance_frame(
-        frame,
-        y_column=args.y_column,
+    response_frame = load_impedance_frame(args.input)
+    figure = plot_response_frame(
+        response_frame,
+        mode=args.mode,
+        angle_unit=args.angle_unit,
         title=args.title,
         note=args.note,
     )
@@ -100,29 +110,34 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def load_impedance_frame(path: Path) -> pd.DataFrame:
-    """Read and validate an owbatch impedance export."""
+    """Read and minimally validate an owbatch impedance export."""
 
     frame = pd.read_csv(path)
-    required_columns = {"case_id", "frequency_hz", "note", *PLOT_COLUMNS}
+    required_columns = {"case_id", "frequency_hz", "re_z", "im_z"}
     missing = sorted(required_columns - set(frame.columns))
     if missing:
         raise ValueError(f"{path} is missing required columns: {missing}")
+    if "note" not in frame.columns:
+        frame["note"] = ""
     return frame
 
 
-def plot_impedance_frame(
+def plot_response_frame(
     frame: pd.DataFrame,
     *,
-    y_column: str = "abs_z",
+    mode: str = "impedance",
+    angle_unit: str = "rad",
     title: str | None = None,
     note: str | None = None,
 ):
-    """Return a matplotlib figure with one line per case."""
+    """Return a 2-panel matplotlib figure for one response mode."""
 
-    if y_column not in PLOT_COLUMNS:
-        raise ValueError(f"Unsupported y-column: {y_column}")
+    if mode not in PLOT_MODES:
+        raise ValueError(f"Unsupported response mode: {mode}")
+    if angle_unit not in ANGLE_UNITS:
+        raise ValueError(f"Unsupported angle unit: {angle_unit}")
 
-    plot_frame = frame.copy()
+    plot_frame = build_response_frame(frame)
     if note is not None:
         plot_frame = plot_frame.loc[plot_frame["note"] == note]
 
@@ -130,24 +145,48 @@ def plot_impedance_frame(
         filter_label = f" for note '{note}'" if note else ""
         raise ValueError(f"No impedance rows available{filter_label}.")
 
-    figure, axis = plt.subplots(figsize=(10, 6))
+    modulus_column, angle_column = get_mode_columns(mode)
+    figure, (modulus_axis, angle_axis) = plt.subplots(
+        2,
+        1,
+        sharex=True,
+        figsize=(10, 8),
+        height_ratios=(2.0, 1.2),
+    )
 
     for case_id, case_frame in plot_frame.groupby("case_id", sort=True):
         case_frame = case_frame.sort_values("frequency_hz")
-        axis.plot(
+        line = modulus_axis.plot(
             case_frame["frequency_hz"],
-            case_frame[y_column],
+            case_frame[modulus_column],
             label=str(case_id),
             linewidth=1.5,
+        )[0]
+        angle_axis.plot(
+            case_frame["frequency_hz"],
+            format_angle_values(case_frame[angle_column], unit=angle_unit),
+            color=line.get_color(),
+            linewidth=1.2,
         )
 
-    axis.set_xlabel("Frequency (Hz)")
-    axis.set_ylabel(y_column)
-    axis.set_title(title or f"{y_column} by case")
-    axis.grid(True, alpha=0.3)
-    axis.legend(title="case_id")
+    modulus_axis.set_ylabel(get_modulus_axis_label(mode))
+    modulus_axis.set_title(title or _build_default_title(mode, note))
+    modulus_axis.grid(True, alpha=0.3)
+    modulus_axis.legend(title="case_id")
+
+    angle_axis.set_xlabel("Frequency (Hz)")
+    angle_axis.set_ylabel(get_angle_axis_label(mode, unit=angle_unit))
+    angle_axis.grid(True, alpha=0.3)
+
     figure.tight_layout()
     return figure
+
+
+def _build_default_title(mode: str, note: str | None) -> str:
+    mode_label = "Impedance" if mode == "impedance" else "Admittance"
+    if note:
+        return f"{mode_label} Response: {note}"
+    return f"{mode_label} Response by case"
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from owbatch.config import (
     build_output_paths,
 )
 from owbatch.models import ExpandedCase, InspectRequest, RunRequest
+from owbatch.response import build_response_rows, compute_admittance
 from owbatch.template_loader import load_template
 from owbatch.writers import (
     sanitize_case_filename,
@@ -67,12 +68,11 @@ def run_batch(request: RunRequest) -> str:
         frequencies, impedance = _compute_case_impedance(case)
         admittance = _compute_admittance(impedance)
         impedance_rows.extend(
-            _build_impedance_rows(
-                case.definition.case_id,
-                case.definition.note or "",
-                frequencies,
-                impedance,
-                admittance,
+            build_response_rows(
+                case_id=case.definition.case_id,
+                note=case.definition.note or "",
+                frequencies=frequencies,
+                impedance=impedance,
             )
         )
         write_impedance_list_csv(
@@ -186,41 +186,8 @@ def _build_openwind_fingering(
     return table
 
 
-def _build_impedance_rows(
-    case_id: str,
-    note: str,
-    frequencies: np.ndarray,
-    impedance: np.ndarray,
-    admittance: np.ndarray | None = None,
-) -> list[dict[str, float | str]]:
-    if admittance is None:
-        admittance = _compute_admittance(impedance)
-
-    rows: list[dict[str, float | str]] = []
-    for frequency_hz, z_value, y_value in zip(frequencies, impedance, admittance):
-        rows.append(
-            {
-                "case_id": case_id,
-                "note": note,
-                "frequency_hz": float(frequency_hz),
-                "re_z": float(np.real(z_value)),
-                "im_z": float(np.imag(z_value)),
-                "abs_z": float(np.abs(z_value)),
-                "angle_z_rad": float(np.angle(z_value)),
-                "angle_z_deg": float(np.degrees(np.angle(z_value))),
-                "abs_y": float(np.abs(y_value)),
-                "angle_y_rad": float(np.angle(y_value)),
-                "angle_y_deg": float(np.degrees(np.angle(y_value))),
-            }
-        )
-    return rows
-
-
 def _compute_admittance(impedance: np.ndarray) -> np.ndarray:
-    admittance = np.full_like(impedance, np.nan + 1j * np.nan, dtype=complex)
-    nonzero_mask = np.abs(impedance) > 0
-    admittance[nonzero_mask] = 1.0 / impedance[nonzero_mask]
-    return admittance
+    return compute_admittance(impedance)
 
 
 def _build_impedance_list_path(output_dir: Path, case_id: str) -> Path:

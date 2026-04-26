@@ -1,6 +1,8 @@
 """Feature extraction entry points.
 
-Implementation is intentionally deferred to the next milestone.
+Feature extraction is intentionally deferred, but future implementations
+should be built on top of ``owbatch.response`` so plotting, resonance picking,
+and analysis share the same impedance/admittance semantics.
 """
 
 from __future__ import annotations

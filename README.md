@@ -168,19 +168,57 @@ owbatch run \
   文件使用空格分隔，并允许科学计数法，风格接近 OpenWind 原始导出
 - `features.csv` 和 `analysis.csv` 目前先输出空表头，占住接口
 
+## 响应语义
+
+当前项目已经显式引入一层共享的响应语义派生逻辑，位于 `src/owbatch/response.py`。
+
+输入真源仍然是复阻抗采样：
+- `frequency_hz`
+- `re_z`
+- `im_z`
+
+在当前研究阶段统一取 `Zc0 = 1`，因此语义约定为：
+- 阻抗模式：
+  - 上图/主模值：`|Z|`
+  - 下图/相位：`angle(Z)`
+- 导纳模式：
+  - 上图/主模值：`|Y| = |1 / Z|`
+  - 下图/相位：`angle(Y) = angle(1 / Z)`
+
+这层逻辑会被：
+- `runner.py` 复用，用于构建 `impedance.csv`
+- `visulization/plot_impedance.py` 复用，用于画 OpenWind 语义一致的响应图
+- 未来的 `extractors.py` / `analysis.csv` 复用，用于 resonance / antiresonance、Q-factor、f1/f2/f3 等
+
+当前也约定了一个面向后续特征提取的默认语义：
+- 非 flute-like player：默认主特征族为 `z_resonance`
+- flute-like player，例如 `FLUTE` / `SOPRANO_RECORDER`：默认主特征族为 `y_resonance`
+
 ## 可视化
 
-仓库当前包含一个简单绘图工具，可对 `out/impedance.csv` 按 `case_id` 画折线图：
+仓库当前包含一个简单绘图工具，可对 `out/impedance.csv` 按 `case_id` 画响应双图：
 
 ```bash
-owbatch-plot-impedance --input ./out/impedance.csv --output ./out/impedance_abs_z.png
+owbatch-plot-impedance --input ./out/impedance.csv --output ./out/impedance_response.png
 ```
 
-默认绘制 `abs_z` 对 `frequency_hz`。也可改成例如：
+默认按阻抗语义绘制双图：
+- 上图：`|Z|`
+- 下图：`angle(Z)`
+
+若要按导纳语义对齐 OpenWind demo 的 admittance 视图，可使用：
 
 ```bash
-owbatch-plot-impedance --input ./out/impedance.csv --y-column abs_y --output ./out/impedance_abs_y.png
+owbatch-plot-impedance \
+  --input ./out/impedance.csv \
+  --mode admittance \
+  --angle-unit deg \
+  --output ./out/admittance_response.png
 ```
+
+此时绘制：
+- 上图：`|Y|`
+- 下图：`angle(Y)`
 
 ## 目录职责
 
@@ -196,6 +234,8 @@ owbatch-plot-impedance --input ./out/impedance.csv --y-column abs_y --output ./o
   下一阶段负责读取模板 CSV 并形成内存对象。
 - `src/owbatch/case_expander.py`
   下一阶段负责把 `cases.csv` 覆盖展开为完整几何与求解请求。
+- `src/owbatch/response.py`
+  统一的响应语义层，负责从 `re_z` / `im_z` 派生 `|Z|`、`angle(Z)`、`|Y|`、`angle(Y)`，供可视化和后续特征提取复用。
 - `src/owbatch/runner.py`
   下一阶段负责组织批处理执行、调用 OpenWind、串联导出。
 - `src/owbatch/extractors.py`

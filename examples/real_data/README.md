@@ -268,6 +268,20 @@ base,G4,100,3000,5,25,false,TMM,unflanged,false,true
 
 ## 当前流程
 
+## 响应图语义
+
+当前 owbatch 的频域可视化遵循与 OpenWind demo 对齐的语义，但在实现上暂时固定 `Zc0 = 1`。
+
+因此：
+- 阻抗模式：
+  - 上图画 `|Z|`
+  - 下图画 `angle(Z)`
+- 导纳模式：
+  - 上图画 `|Y| = |1 / Z|`
+  - 下图画 `angle(Y) = angle(1 / Z)`
+
+这套逻辑不是只存在于画图层，而是由共享的响应派生层统一提供，后续 `features.csv` / `analysis.csv` 也会基于同一套语义。
+
 填完之后可先跑：
 
 ```bash
@@ -293,21 +307,23 @@ PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m 
 
 ## 简单绘图
 
-可以直接把 `out/impedance.csv` 画成每个 case 一条线的折线图。
+可以直接把 `out/impedance.csv` 画成每个 case 一条线的双图响应。
 
-画阻抗幅值：
+画阻抗语义响应：
 
 ```bash
 PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.plot_impedance \
   --input examples/real_data/out/impedance.csv \
-  --output examples/real_data/out/impedance_abs_z.png
+  --mode impedance \
+  --output examples/real_data/out/impedance_response.png
 ```
 
-画导纳幅值：
+画导纳语义响应：
 
 ```bash
 PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.plot_impedance \
   --input examples/real_data/out/impedance.csv \
-  --y-column abs_y \
-  --output examples/real_data/out/impedance_abs_y.png
+  --mode admittance \
+  --angle-unit deg \
+  --output examples/real_data/out/admittance_response.png
 ```
