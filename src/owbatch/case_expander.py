@@ -41,7 +41,7 @@ def expand_cases(template: LoadedTemplate, cases_path: Path) -> list[ExpandedCas
 
     case_rows = _read_case_rows(cases_path)
     if not case_rows:
-        raise ValueError(f"{cases_path} does not contain any cases.")
+        raise ValueError(f"{cases_path} does not contain any enabled cases.")
 
     expanded_cases: list[ExpandedCase] = []
     seen_case_ids: set[str] = set()
@@ -69,7 +69,11 @@ def expand_cases(template: LoadedTemplate, cases_path: Path) -> list[ExpandedCas
                 bore_rows=bore_rows,
                 holes_rows=holes_rows,
                 fingering_rows=fingering_rows,
-                openwind_kwargs=_build_openwind_kwargs(definition),
+                openwind_kwargs=_build_openwind_kwargs(
+                    definition,
+                    has_holes=bool(holes_rows),
+                    has_fingering_rows=bool(fingering_rows),
+                ),
             )
         )
 
@@ -81,7 +85,15 @@ def _read_case_rows(cases_path: Path) -> list[dict[str, str]]:
     if "case_id" not in frame.columns:
         raise ValueError(f"{cases_path} is missing required column 'case_id'.")
 
-    return frame.to_dict(orient="records")
+    return [
+        row
+        for row in frame.to_dict(orient="records")
+        if not _is_skipped_case_row(row)
+    ]
+
+
+def _is_skipped_case_row(row: dict[str, str]) -> bool:
+    return str(row.get("skip", "")).strip().lower() == "y"
 
 
 def _build_case_definition(case_id: str, row: dict[str, str]) -> CaseDefinition:
@@ -245,9 +257,14 @@ def _resolve_hole_target(
     raise ValueError(f"Case '{case_id}' refers to unknown hole '{target}'.")
 
 
-def _build_openwind_kwargs(definition: CaseDefinition) -> dict[str, object]:
+def _build_openwind_kwargs(
+    definition: CaseDefinition,
+    *,
+    has_holes: bool,
+    has_fingering_rows: bool,
+) -> dict[str, object]:
     kwargs: dict[str, object] = {}
-    if definition.note is not None:
+    if definition.note is not None and has_holes and has_fingering_rows:
         kwargs["note"] = definition.note
     if definition.solver.temperature_c is not None:
         kwargs["temperature"] = definition.solver.temperature_c
@@ -272,6 +289,11 @@ def _validate_case_note(
     cases_path: Path,
 ) -> None:
     if definition.note is None:
+        return
+
+    # A template with zero hole rows is semantically a holeless instrument.
+    # In that case `note` has no operational effect and is ignored for solving.
+    if not template.holes_rows:
         return
 
     available_notes = [

@@ -18,6 +18,71 @@ def test_load_template_reads_rows_and_columns() -> None:
     assert list(template.fingering_rows[0].keys()) == ["label", "open", "closed"]
 
 
+def test_load_template_allows_missing_optional_holes_and_fingering_files(tmp_path: Path) -> None:
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+    (template_dir / "bore_template.csv").write_text(
+        "\n".join(
+            [
+                "x0,x1,d0,d1,type",
+                "0,500,20,20,linear",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    template = load_template(template_dir)
+
+    assert len(template.bore_rows) == 1
+    assert template.holes_columns == ["label", "position", "length", "diameter"]
+    assert template.holes_rows == []
+    assert template.fingering_columns == ["label"]
+    assert template.fingering_rows == []
+
+
+def test_expand_cases_treats_empty_holes_and_fingering_tables_as_holeless_even_with_note(
+    tmp_path: Path,
+) -> None:
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+    (template_dir / "bore_template.csv").write_text(
+        "\n".join(
+            [
+                "x0,x1,d0,d1,type",
+                "0,500,20,20,linear",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "holes_template.csv").write_text(
+        "label,position,length,diameter\n",
+        encoding="utf-8",
+    )
+    (template_dir / "fingering_template.csv").write_text(
+        "label\n",
+        encoding="utf-8",
+    )
+    template = load_template(template_dir)
+    cases_path = tmp_path / "cases.csv"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves",
+                "holeless_probe,G4,100,300,25,25,false,TMM,unflanged,false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    expanded = expand_cases(template, cases_path)
+
+    assert len(expanded) == 1
+    assert expanded[0].definition.note == "G4"
+    assert expanded[0].holes_rows == []
+    assert expanded[0].fingering_rows == []
+    assert "note" not in expanded[0].openwind_kwargs
+
+
 def test_expand_cases_applies_transforms_and_overrides() -> None:
     template = load_template(FIXTURE_DIR)
 
@@ -34,6 +99,27 @@ def test_expand_cases_applies_transforms_and_overrides() -> None:
     assert variant_case.holes_rows[1]["position"] == "242"
     assert variant_case.holes_rows[0]["diameter"] == "4.4"
     assert variant_case.holes_rows[1]["diameter"] == "4.95"
+
+
+def test_expand_cases_skips_rows_marked_y(tmp_path: Path) -> None:
+    template = load_template(FIXTURE_DIR)
+    cases_path = tmp_path / "cases.csv"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,skip,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves",
+                "skipped,y,open,100,300,25,25,false,TMM,unflanged,false",
+                "computed,n,closed,100,300,25,25,false,TMM,unflanged,false",
+                "blank_skip,,open,100,300,25,25,false,TMM,unflanged,false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    expanded = expand_cases(template, cases_path)
+
+    assert [case.definition.case_id for case in expanded] == ["computed", "blank_skip"]
+    assert all("skip" not in case.definition.geometry_overrides for case in expanded)
 
 
 def test_expand_cases_maps_flute_type_to_player_preset(tmp_path: Path) -> None:

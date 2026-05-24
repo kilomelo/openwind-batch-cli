@@ -9,6 +9,7 @@ import pandas as pd
 
 from owbatch.cli import main
 from owbatch.config import ANALYSIS_COLUMNS, FEATURE_COLUMNS, IMPEDANCE_COLUMNS
+from owbatch.runner import compute_batch_frames
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "basic_instrument"
 
@@ -168,3 +169,121 @@ def test_run_command_supports_flute_player_preset(tmp_path: Path) -> None:
     assert not np.allclose(flow_abs_z, flute_abs_z)
     assert flute_modes == {"admittance"}
     assert flute_feature_families == {"y_resonance"}
+
+
+def test_run_command_supports_holeless_instrument_with_missing_optional_templates(
+    tmp_path: Path,
+) -> None:
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+    (template_dir / "bore_template.csv").write_text(
+        "\n".join(
+            [
+                "x0,x1,d0,d1,type",
+                "0,500,20,20,linear",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    cases_path = tmp_path / "cases.csv"
+    out_dir = tmp_path / "out"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves",
+                "no_holes,100,400,25,25,false,TMM,unflanged,false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "run",
+            "--template-dir",
+            str(template_dir),
+            "--cases",
+            str(cases_path),
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert exit_code == 0
+
+    impedance_frame = pd.read_csv(out_dir / "impedance.csv")
+    assert set(impedance_frame["case_id"]) == {"no_holes"}
+    assert len(impedance_frame) > 0
+
+
+def test_run_command_supports_holeless_instrument_with_empty_optional_tables_and_note(
+    tmp_path: Path,
+) -> None:
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+    (template_dir / "bore_template.csv").write_text(
+        "\n".join(
+            [
+                "x0,x1,d0,d1,type",
+                "0,500,20,20,linear",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "holes_template.csv").write_text(
+        "label,position,length,diameter\n",
+        encoding="utf-8",
+    )
+    (template_dir / "fingering_template.csv").write_text(
+        "label\n",
+        encoding="utf-8",
+    )
+    cases_path = tmp_path / "cases.csv"
+    out_dir = tmp_path / "out"
+    cases_path.write_text(
+        "\n".join(
+            [
+                "case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves",
+                "no_holes_with_note,G4,100,400,25,25,false,TMM,unflanged,false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "run",
+            "--template-dir",
+            str(template_dir),
+            "--cases",
+            str(cases_path),
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert exit_code == 0
+
+    impedance_frame = pd.read_csv(out_dir / "impedance.csv")
+    assert set(impedance_frame["case_id"]) == {"no_holes_with_note"}
+    assert set(impedance_frame["note"]) == {"G4"}
+    assert len(impedance_frame) > 0
+
+
+def test_compute_batch_frames_reports_case_progress() -> None:
+    progress_events: list[tuple[int, int, str]] = []
+
+    batch = compute_batch_frames(
+        template_dir=FIXTURE_DIR,
+        cases_path=FIXTURE_DIR / "cases.csv",
+        progress_callback=lambda completed, total, case_id: progress_events.append(
+            (completed, total, case_id)
+        ),
+    )
+
+    assert len(batch.expanded_cases) == 2
+    assert progress_events == [
+        (0, 2, ""),
+        (1, 2, "base"),
+        (2, 2, "variant"),
+    ]

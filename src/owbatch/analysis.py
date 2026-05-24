@@ -63,7 +63,7 @@ def extract_analysis_rows(
             (str(case_id), str(note)): grouped_frame.sort_values(["index", "frequency_hz"]).reset_index(drop=True)
             for (case_id, note), grouped_frame in features_frame.groupby(
                 ["case_id", "note"],
-                sort=True,
+                sort=False,
                 dropna=False,
             )
         }
@@ -72,10 +72,7 @@ def extract_analysis_rows(
     if case_frame is not None and not case_frame.empty:
         _validate_case_frame(case_frame)
         seen_groups: set[tuple[str, str]] = set()
-        unique_case_frame = case_frame.drop_duplicates(["case_id", "note"]).sort_values(
-            ["case_id", "note"],
-            kind="stable",
-        )
+        unique_case_frame = case_frame.drop_duplicates(["case_id", "note"])
         for case_row in unique_case_frame.to_dict(orient="records"):
             group_key = (str(case_row["case_id"]), str(case_row.get("note", "")))
             seen_groups.add(group_key)

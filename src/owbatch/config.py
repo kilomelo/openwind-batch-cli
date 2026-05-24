@@ -6,6 +6,7 @@ from pathlib import Path
 
 PACKAGE_NAME = "owbatch"
 GEOMETRY_UNIT = "mm"
+CASES_FILENAME = "cases.csv"
 
 BORE_TEMPLATE_FILENAME = "bore_template.csv"
 HOLES_TEMPLATE_FILENAME = "holes_template.csv"
@@ -49,6 +50,7 @@ DEFAULT_PRIMARY_PEAK_COUNT = 3
 
 RESERVED_CASE_COLUMNS = {
     "case_id",
+    "skip",
     "note",
     "f_start",
     "f_stop",

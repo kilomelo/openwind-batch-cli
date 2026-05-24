@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from dataclasses import asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +29,27 @@ from owbatch.writers import (
     write_impedance_csv,
     write_impedance_list_csv,
 )
+
+
+@dataclass(slots=True)
+class ComputedCaseResult:
+    """One fully computed case with its sampled frequency-domain response."""
+
+    case: ExpandedCase
+    frequencies: np.ndarray
+    impedance: np.ndarray
+    admittance: np.ndarray
+
+
+@dataclass(slots=True)
+class BatchFrames:
+    """In-memory batch outputs reused by CLI, plotting, and future GUI tools."""
+
+    expanded_cases: list[ExpandedCase]
+    computed_cases: list[ComputedCaseResult]
+    impedance_frame: pd.DataFrame
+    features_frame: pd.DataFrame
+    analysis_frame: pd.DataFrame
 
 
 def inspect_inputs(request: InspectRequest) -> str:
@@ -60,50 +82,37 @@ def inspect_inputs(request: InspectRequest) -> str:
 def run_batch(request: RunRequest) -> str:
     """Execute the current batch and write CSV outputs."""
 
-    template = load_template(request.template_dir)
-    expanded_cases = expand_cases(template, request.cases_path)
+    batch = compute_batch_frames(
+        template_dir=request.template_dir,
+        cases_path=request.cases_path,
+    )
     output_paths = build_output_paths(request.out_dir)
     request.out_dir.mkdir(parents=True, exist_ok=True)
 
-    impedance_rows: list[dict[str, float | str]] = []
-    for case in expanded_cases:
-        frequencies, impedance = _compute_case_impedance(case)
-        admittance = _compute_admittance(impedance)
-        impedance_rows.extend(
-            build_response_rows(
-                case_id=case.definition.case_id,
-                note=case.definition.note or "",
-                frequencies=frequencies,
-                impedance=impedance,
-                player_preset=case.definition.solver.player_preset,
-            )
-        )
+    impedance_rows = batch.impedance_frame.to_dict(orient="records")
+    feature_rows = batch.features_frame.to_dict(orient="records")
+    analysis_rows = batch.analysis_frame.to_dict(orient="records")
+
+    for computed_case in batch.computed_cases:
         write_impedance_list_csv(
             _build_impedance_list_path(
                 output_paths["impedance_lists_dir"],
-                case.definition.case_id,
+                computed_case.case.definition.case_id,
             ),
-            case_id=case.definition.case_id,
-            note=case.definition.note,
-            frequencies=frequencies.tolist(),
-            admittance_magnitude=np.abs(admittance).tolist(),
-            admittance_phase_rad=np.angle(admittance).tolist(),
+            case_id=computed_case.case.definition.case_id,
+            note=computed_case.case.definition.note,
+            frequencies=computed_case.frequencies.tolist(),
+            admittance_magnitude=np.abs(computed_case.admittance).tolist(),
+            admittance_phase_rad=np.angle(computed_case.admittance).tolist(),
         )
 
-    impedance_frame = _build_response_export_frame(impedance_rows)
     write_impedance_csv(output_paths["impedance"], impedance_rows)
-    features_frame = extract_frequency_features(impedance_frame)
-    feature_rows = features_frame.to_dict(orient="records")
     write_features_csv(output_paths["features"], feature_rows)
-    analysis_rows = extract_analysis_rows(
-        features_frame,
-        case_frame=impedance_frame,
-    ).to_dict(orient="records")
     write_analysis_csv(output_paths["analysis"], analysis_rows)
 
     return "\n".join(
         [
-            f"cases_processed: {len(expanded_cases)}",
+            f"cases_processed: {len(batch.expanded_cases)}",
             f"impedance_rows: {len(impedance_rows)}",
             f"feature_rows: {len(feature_rows)}",
             f"analysis_rows: {len(analysis_rows)}",
@@ -113,6 +122,60 @@ def run_batch(request: RunRequest) -> str:
             f"analysis_csv: {output_paths['analysis']}",
             "status: aggregate impedance, per-case impedance lists, primary peak features, and per-case harmonic analysis are complete.",
         ]
+    )
+
+
+def compute_batch_frames(
+    *,
+    template_dir: Path,
+    cases_path: Path,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> BatchFrames:
+    """Compute one batch fully in memory without writing output files."""
+
+    template = load_template(template_dir)
+    expanded_cases = expand_cases(template, cases_path)
+    total_cases = len(expanded_cases)
+    if progress_callback is not None:
+        progress_callback(0, total_cases, "")
+
+    computed_cases: list[ComputedCaseResult] = []
+    impedance_rows: list[dict[str, float | str]] = []
+    for index, case in enumerate(expanded_cases, start=1):
+        frequencies, impedance = _compute_case_impedance(case)
+        admittance = _compute_admittance(impedance)
+        computed_cases.append(
+            ComputedCaseResult(
+                case=case,
+                frequencies=frequencies,
+                impedance=impedance,
+                admittance=admittance,
+            )
+        )
+        impedance_rows.extend(
+            build_response_rows(
+                case_id=case.definition.case_id,
+                note=case.definition.note or "",
+                frequencies=frequencies,
+                impedance=impedance,
+                player_preset=case.definition.solver.player_preset,
+            )
+        )
+        if progress_callback is not None:
+            progress_callback(index, total_cases, case.definition.case_id)
+
+    impedance_frame = _build_response_export_frame(impedance_rows)
+    features_frame = extract_frequency_features(impedance_frame)
+    analysis_frame = extract_analysis_rows(
+        features_frame,
+        case_frame=impedance_frame,
+    )
+    return BatchFrames(
+        expanded_cases=expanded_cases,
+        computed_cases=computed_cases,
+        impedance_frame=impedance_frame,
+        features_frame=features_frame,
+        analysis_frame=analysis_frame,
     )
 
 

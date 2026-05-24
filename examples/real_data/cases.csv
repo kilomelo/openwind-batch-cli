@@ -1,4 +1,13 @@
-case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument,player_preset,source_location
-flow_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,false,,entrance
-flute_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,true,,entrance
-recorder_probe,all_closed,100,2000,5,25,false,TMM,unflanged,false,,SOPRANO_RECORDER,entrance
+case_id,skip,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument,player_preset,source_location,hole_h0_diameter,hole_h0_length
+D4,n,D4,280,900,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+D4s,y,D4s,300,950,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+E4,y,E4,310,1000,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+F4,y,F4,320,1050,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+F4s,y,F4s,350,1150,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+G4,y,G4,380,1200,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+G4s,y,G4s,410,1270,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,10.1,5
+t1,n,D4,280,1350,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,9.6,4.5
+t2,n,D4,280,1350,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,8.6,3
+t3,n,D4,280,1350,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,7.6,1.5
+t4,y,D4,280,1350,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,8.1,3
+t5,y,D4,280,1350,0.1,25,FALSE,TMM,unflanged,FALSE,TRUE,,entrance,7.6,2.5

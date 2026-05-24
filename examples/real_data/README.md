@@ -9,6 +9,13 @@
 - `template/fingering_template.csv`
 - `cases.csv`
 
+其中：
+- `template/bore_template.csv` 是必需的
+- `template/holes_template.csv` 对无音孔乐器可以省略，或保留为空表
+- `template/fingering_template.csv` 对无音孔且不依赖 `note` 切换的情况可以省略，或保留为空表
+- 如果 `holes_template.csv` 和 `fingering_template.csv` 都存在但没有数据行，也会按无孔乐器处理
+- 这种情况下，即使 `cases.csv` 的 `note` 不为空，也不会阻止计算；该值会保留在输出里，但不会参与指法切换
+
 ## 填写说明
 
 当前版本的共通约定：
@@ -161,6 +168,11 @@ h2,o,x
   - 用于生成 `impedances/<case_id>.csv`
   建议：
   - 只用字母、数字、下划线、减号
+- `skip`
+  是否跳过该 case。
+  取值：
+  - `y`：跳过，不参与模拟计算
+  - `n` 或空值：正常模拟计算
 - `note`
   本 case 使用的 fingering 名。
   必须和 `fingering_template.csv` 的某个列名一致。
@@ -262,8 +274,8 @@ h2,o,x
 建议最小起步行：
 
 ```csv
-case_id,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument
-base,G4,100,3000,5,25,false,TMM,unflanged,false,true
+case_id,skip,note,f_start,f_stop,f_step,temperature_c,losses,compute_method,radiation_category,spherical_waves,flute_type_instrument
+base,n,G4,100,3000,5,25,false,TMM,unflanged,false,true
 ```
 
 ## 当前流程
@@ -374,3 +386,32 @@ PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m 
 - 对应峰值频率 `fN`
 - 对应比值 `hN`
 - 最近整数倍
+
+如果你希望把目录选择、自动重算和四张图整合到一个窗口里，可以直接启动 dashboard：
+
+```bash
+PYTHONPATH=src /Users/chenweichu/dev/miniconda3/envs/openwind-cli/bin/python -m visulization.study_dashboard \
+  --directory examples/real_data
+```
+
+启动后：
+- 会自动识别 `examples/real_data/template` 和 `examples/real_data/cases.csv`
+- 自动开始计算
+- 计算过程中，状态栏会实时显示 `正在计算…… m/n 条 case`
+- 左侧会列出 `case_id` 选择列表；只有选中的 case 会显示在图里
+- 左侧还有一个 `全选` 按钮；如果当前没有全选则会全部选中，如果已经全选则会全部取消
+- 如果当前四张图已经正常显示，可以点击 `保存图表`，把当前窗口中的整套图表布局保存为一张 PNG 到所选源数据目录下，文件名为时间戳
+- 在同一个窗口里显示：
+  - Admittance modulus
+  - Admittance angle
+  - Pitch frequency
+  - Harmonic deviation
+
+如果后续你改了 `cases.csv` 或 `template/` 里的源数据，可以直接点窗口里的 `刷新` 重新计算。
+任意 case 选择状态变化都会立即重绘四张图。
+
+右上角 `Pitch frequency` 图会根据 `analysis.csv` 中有值的 `fN` 列自动决定折线数量。
+把鼠标悬停到点上时，会显示：
+- `pitch`
+- `pitch_cents`
+- `q`

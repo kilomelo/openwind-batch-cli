@@ -1,3 +1,8 @@
-label,position,length,diameter,type,group,variety,reconnection
-L0,400,3,8.0,linear,upper
-R0,500,3,9.0,linear,upper
+label,position,length,diameter,type,group,variety,reconnection,dist,freq,note
+h0,558,5,10.1,linear,upper,hole,,,293.66,D4
+h1,514,5,7.1,linear,upper,hole,,-44,311.13,D4s
+h2,489,4,7.9,linear,upper,hole,,-25,329.63,E4
+h3,464,3,8.8,linear,upper,hole,,-25,349.23,F4
+h4,437,3,9.3,linear,upper,hole,,-27,369.99,F4s
+h5,410,3,8.8,linear,upper,hole,,-27,392,G4
+h6,383,3,7.9,linear,upper,hole,,-27,415.3,G4s

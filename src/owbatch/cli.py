@@ -34,7 +34,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--template-dir",
         required=True,
         type=Path,
-        help="Directory containing bore_template.csv, holes_template.csv, and fingering_template.csv.",
+        help=(
+            "Directory containing bore_template.csv. "
+            "holes_template.csv and fingering_template.csv are optional for holeless inputs."
+        ),
     )
     inspect_parser.add_argument(
         "--cases",
@@ -52,7 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--template-dir",
         required=True,
         type=Path,
-        help="Directory containing bore_template.csv, holes_template.csv, and fingering_template.csv.",
+        help=(
+            "Directory containing bore_template.csv. "
+            "holes_template.csv and fingering_template.csv are optional for holeless inputs."
+        ),
     )
     run_parser.add_argument(
         "--cases",

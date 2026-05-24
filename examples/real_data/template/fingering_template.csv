@@ -1,3 +1,8 @@
-label,all_open,close_L0,all_closed
-L0,o,x,x
-R0,o,o,x
+label,D4,D4s,E4,F4,F4s,G4,G4s
+h0,o,o,o,o,o,o,o
+h1,c,o,o,o,o,o,o
+h2,c,c,o,o,o,o,o
+h3,c,c,c,o,o,o,o
+h4,c,c,c,c,o,o,o
+h5,c,c,c,c,c,o,o
+h6,c,c,c,c,c,c,o

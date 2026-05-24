@@ -138,7 +138,7 @@ def prepare_analysis_plot_frame(
     *,
     note: str | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Filter, validate, and sort an analysis frame for plotting."""
+    """Filter and validate an analysis frame for plotting."""
 
     plot_frame = frame.copy()
     if note is not None:
@@ -154,7 +154,7 @@ def prepare_analysis_plot_frame(
             "No populated deltaN_cents columns were found in the analysis data."
         )
 
-    plot_frame = plot_frame.sort_values(["case_id", "note"], kind="stable").reset_index(drop=True)
+    plot_frame = plot_frame.reset_index(drop=True)
     return plot_frame, delta_columns
 
 

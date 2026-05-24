@@ -10,6 +10,7 @@ from visulization.plot_analysis import (
     detect_populated_delta_columns,
     main as plot_analysis_main,
     plot_analysis_frame,
+    prepare_analysis_plot_frame,
 )
 from visulization.plot_impedance import (
     load_impedance_frame,
@@ -122,6 +123,27 @@ def test_plot_response_frame_explicit_mode_overrides_auto_semantics() -> None:
     assert figure.axes[1].get_ylabel() == "angle(Y) [rad]"
 
 
+def test_plot_response_frame_preserves_first_seen_case_order() -> None:
+    frame = pd.DataFrame(
+        {
+            "case_id": ["case_2", "case_2", "case_10", "case_10", "case_1", "case_1"],
+            "note": ["open", "open", "open", "open", "open", "open"],
+            "frequency_hz": [200.0, 100.0, 200.0, 100.0, 200.0, 100.0],
+            "re_z": [2.0, 1.0, 3.0, 1.5, 4.0, 2.5],
+            "im_z": [0.5, -0.2, 0.4, -0.1, 0.3, -0.3],
+            "player_preset": ["FLUTE", "FLUTE", "FLUTE", "FLUTE", "FLUTE", "FLUTE"],
+        }
+    )
+
+    figure = plot_response_frame(frame, mode="admittance", angle_unit="rad")
+
+    assert [text.get_text() for text in figure.axes[0].get_legend().texts] == [
+        "case_2",
+        "case_10",
+        "case_1",
+    ]
+
+
 def test_plot_analysis_cli_writes_png(tmp_path: Path) -> None:
     analysis_path = tmp_path / "analysis.csv"
     plot_path = tmp_path / "plots" / "analysis.png"
@@ -192,6 +214,20 @@ def test_plot_analysis_frame_draws_one_line_per_populated_delta_column() -> None
     assert len(figure.axes) == 1
     assert figure.axes[0].get_ylabel() == "Deviation [cents]"
     assert len(figure.axes[0].lines) == 2
+
+
+def test_prepare_analysis_plot_frame_preserves_first_seen_case_order() -> None:
+    frame = pd.DataFrame(
+        {
+            "case_id": ["case_2", "case_10", "case_1"],
+            "note": ["open", "open", "open"],
+            "delta2_cents": [12.0, 8.0, 10.0],
+        }
+    )
+
+    plot_frame, _delta_columns = prepare_analysis_plot_frame(frame)
+
+    assert plot_frame["case_id"].tolist() == ["case_2", "case_10", "case_1"]
 
 
 def test_plot_interactive_analysis_frame_builds_hoverable_lines() -> None:

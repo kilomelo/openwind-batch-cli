@@ -31,11 +31,17 @@ def load_template(template_dir: Path) -> LoadedTemplate:
     """Load template CSV files into memory."""
 
     manifest = build_template_manifest(template_dir)
-    _ensure_template_files_exist(manifest)
+    _ensure_required_template_files_exist(manifest)
 
     bore_columns, bore_rows = _read_csv_rows(manifest.bore_path)
-    holes_columns, holes_rows = _read_csv_rows(manifest.holes_path)
-    fingering_columns, fingering_rows = _read_csv_rows(manifest.fingering_path)
+    holes_columns, holes_rows = _read_optional_csv_rows(
+        manifest.holes_path,
+        default_columns=list(HOLES_TEMPLATE_REQUIRED_COLUMNS),
+    )
+    fingering_columns, fingering_rows = _read_optional_csv_rows(
+        manifest.fingering_path,
+        default_columns=list(FINGERING_TEMPLATE_REQUIRED_COLUMNS),
+    )
 
     _validate_required_columns(
         manifest.bore_path,
@@ -79,20 +85,24 @@ def load_template(template_dir: Path) -> LoadedTemplate:
     )
 
 
-def _ensure_template_files_exist(manifest: TemplateManifest) -> None:
-    missing_paths = [
-        path
-        for path in (manifest.bore_path, manifest.holes_path, manifest.fingering_path)
-        if not path.exists()
-    ]
-    if missing_paths:
-        formatted = ", ".join(str(path) for path in missing_paths)
-        raise FileNotFoundError(f"Missing template file(s): {formatted}")
+def _ensure_required_template_files_exist(manifest: TemplateManifest) -> None:
+    if not manifest.bore_path.exists():
+        raise FileNotFoundError(f"Missing template file(s): {manifest.bore_path}")
 
 
 def _read_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
     frame = read_csv_frame(path)
     return frame.columns.tolist(), frame.to_dict(orient="records")
+
+
+def _read_optional_csv_rows(
+    path: Path,
+    *,
+    default_columns: list[str],
+) -> tuple[list[str], list[dict[str, str]]]:
+    if not path.exists():
+        return default_columns, []
+    return _read_csv_rows(path)
 
 
 def _validate_required_columns(

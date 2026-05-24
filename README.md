@@ -87,10 +87,18 @@ owbatch run \
 
 ### 模板目录
 
-模板目录至少预留以下三个文件名：
+模板目录最少需要：
 - `bore_template.csv`
+
+可选文件：
 - `holes_template.csv`
 - `fingering_template.csv`
+
+说明：
+- `holes_template.csv` 对无音孔乐器可以省略，或保留为只有表头的空表
+- `fingering_template.csv` 对无音孔且不使用 `note` 指法切换的情况可以省略，或保留为只有 `label` 表头的空表
+- 如果 `holes_template.csv` 和 `fingering_template.csv` 文件存在但没有数据行，也会按无孔乐器处理
+- 这种无孔情形下，即使 `cases.csv` 里的 `note` 不为空，也不会阻止计算；该 `note` 会保留在输出中，但不会参与 OpenWind 指法切换
 
 当前最小 schema：
 
@@ -103,11 +111,15 @@ owbatch run \
 `holes_template.csv`
 - 必需列：`label`, `position`, `length`, `diameter`
 - 可选列：`type`, `group`, `variety`, `reconnection`
+- 文件可为空表；对无音孔乐器也可以直接省略
 
 `fingering_template.csv`
 - 第一列必须是 `label`
 - 其余列名视为 note 名
 - 单元格使用 OpenWind 兼容的 `o` / `x`
+- 文件可为空表；若模板存在 hole 数据行且 `cases.csv` 里使用了 `note`，则仍需要相应的指法列名
+  例外：
+  - 如果模板整体没有任何 hole 数据行，则即使 `note` 不为空，也按无孔乐器处理，不要求存在对应指法列
 
 ### `cases.csv`
 
@@ -115,6 +127,7 @@ owbatch run \
 
 保留字段：
 - `case_id`
+- `skip`
 - `note`
 - `f_start`
 - `f_stop`
@@ -139,6 +152,7 @@ owbatch run \
 - `bore_2_d1`
 
 约定：
+- `skip` 放在 `case_id` 与 `note` 之间；值为 `y` 时跳过该 case，不参与展开和计算；值为 `n` 或空值时正常计算
 - case 行中的非空字段覆盖模板默认值
 - 未识别字段先保留为原始覆盖项，后续由 case 展开层解释
 - 当前已支持的逐项覆盖：
@@ -278,6 +292,47 @@ owbatch-view-analysis \
 当前行为：
 - 打开 Matplotlib 交互窗口，不保存图片
 - 鼠标悬停到点上时，会显示 `case`、`note`、`deltaN_cents`、对应的 `fN`、`hN` 和最近整数倍
+
+如果你希望把目录选择、重算和四张研究图整合到一个桌面工具里，可以使用 dashboard：
+
+```bash
+owbatch-dashboard
+```
+
+或启动时直接预载一个源数据目录：
+
+```bash
+owbatch-dashboard --directory ./examples/real_data
+```
+
+这个目录应包含：
+- `template/`
+- `cases.csv`
+
+当前 dashboard 包含：
+- 目录选择控件和当前路径显示
+- `刷新` 按钮
+- `保存图表` 按钮；当前四张图正常显示时，可将当前布局整体保存为一张 PNG 到所选源数据目录下，文件名为时间戳
+- 左侧 `case_id` 选择列表；只有选中的 case 会被绘制
+- 左侧 `全选` 按钮；若当前未全选则一键全选，若当前已全选则一键全不选
+- 四张嵌入式图表：
+  - Admittance modulus
+  - Admittance angle
+  - Pitch frequency
+  - Harmonic deviation
+
+状态逻辑：
+- 未选择目录时，图表区显示 `请选择包含源数据的目录`
+- 目录结构不满足要求时，图表区显示 `源数据不满足要求`
+- 选择有效目录后会自动开始计算，无需再点一次刷新
+- 计算过程中，状态栏会实时显示 `正在计算…… m/n 条 case`
+- 任意 case 选择状态变化都会立即重绘四张图
+
+其中右上角的 `Pitch frequency` 图：
+- 横轴：`case`
+- 纵轴：峰值频率 `fN`
+- 线条数量取决于 `analysis.csv` 中有值的 `fN` 列数量
+- 悬停标签会显示 `pitch`、`pitch_cents`、`q`
 
 ## 目录职责
 

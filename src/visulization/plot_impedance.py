@@ -157,7 +157,7 @@ def plot_response_frame(
         height_ratios=(2.0, 1.2),
     )
 
-    for case_id, case_frame in plot_frame.groupby("case_id", sort=True):
+    for case_id, case_frame in plot_frame.groupby("case_id", sort=False):
         case_frame = case_frame.sort_values("frequency_hz")
         line = modulus_axis.plot(
             case_frame["frequency_hz"],

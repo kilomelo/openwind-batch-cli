@@ -165,7 +165,7 @@ def test_extract_analysis_rows_keeps_case_without_detected_peaks() -> None:
 
     analysis_frame = extract_analysis_rows(features_frame, case_frame=case_frame)
 
-    assert analysis_frame["case_id"].tolist() == ["no_peak", "with_peak"]
+    assert analysis_frame["case_id"].tolist() == ["with_peak", "no_peak"]
     missing_row = analysis_frame.loc[analysis_frame["case_id"] == "no_peak"].iloc[0]
     assert missing_row["feature_family"] == "z_resonance"
     assert pd.isna(missing_row["f1"])

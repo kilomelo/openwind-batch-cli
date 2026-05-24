@@ -28,6 +28,7 @@ owbatch = "owbatch.cli:main"
 owbatch-plot-impedance = "visulization.plot_impedance:main"
 owbatch-plot-analysis = "visulization.plot_analysis:main"
 owbatch-view-analysis = "visulization.view_analysis:main"
+owbatch-dashboard = "visulization.study_dashboard:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
